@@ -5,19 +5,30 @@ orbs:
   # welcome: circleci/welcome-orb@0.4.1
   aws-cli: circleci/aws-cli@2.1.0
 # Define the jobs we want to run for this project
+commands:
+  destroy_environment:
+    steps:
+      - run:
+          name: Destroy environment
+          # ${CIRCLE_WORKFLOW_ID} is a Built-in environment variable 
+          # ${CIRCLE_WORKFLOW_ID:0:5} takes the first 5 chars of the variable CIRCLE_CI_WORKFLOW_ID 
+          when: on_fail
+          command: |
+            aws cloudformation delete-stack --stack-name udacityStack-${CIRCLE_WORKFLOW_ID:0:7}
+
 jobs:
-  # create_infrastructure: 
-  #   docker:
-  #     - image: amazon/aws-cli
-  #   steps:
-  #     - checkout
-  #     - run:
-  #         name: Create Cloudformation Stack
-  #         command: |
-  #           aws cloudformation deploy \
-  #             --template-file template.yml \
-  #             --stack-name udacityStack-${CIRCLE_WORKFLOW_ID:0:5} \
-  #             --region eu-central-1
+  create_infrastructure: 
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - checkout
+      - run:
+          name: Create Cloudformation Stack
+          command: |
+            aws cloudformation deploy \
+              --template-file template.yml \
+              --stack-name udacityStack-${CIRCLE_WORKFLOW_ID:0:7} \
+              --region eu-central-1
   # configure_infrasctructure:
   #   docker:
   #     - image: python:3.7-alpine3.11
@@ -40,22 +51,18 @@ jobs:
     docker:
       - image: alpine:latest
     steps:
-      - run: apk add --update curl
       - run:
           name: smoke test
           command: |
-            URL="https://blog.udacity.com/"
-            # Test is website exists
-            if curl -s --head ${URL}
-            then
-              return 0 # success :)
-            else
-              return 1 # failed :(
-            fi            
+            return 1 # simulate failure     
+      - destroy_environment  
+       
 
 # Sequential workflow
 workflows:
   # Name the workflow
   deploy:
     jobs:
-      - smoke_test
+      - create_infrastructure
+      - smoke_test:
+          requires: create_infrastructure
